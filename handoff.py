@@ -32,7 +32,7 @@ class Application(Tk):
         self.frames = {}
         self.pages = []
         
-        for F in (Handoff_threshold, Start_page, Non_priority,Priority,Handoff_queue):
+        for F in (Start_page, Non_priority,Priority,Handoff_queue):
 
             frame = F(container, self)
             self.frames[F] = frame
@@ -47,17 +47,14 @@ class Application(Tk):
 
 class Start_page(Frame):
 
-    def __init__(self, parent, controller):
-        Frame.__init__(self,parent)
-        label = Label(self, text="Start Page", font=LARGE_FONT)
-        label.pack(pady=10,padx=10)
+    # def __init__(self, parent, controller):
+    #     Frame.__init__(self,parent)
+    #     label = Label(self, text="Start Page", font=LARGE_FONT)
+    #     label.pack(pady=10,padx=10)
 
-        button = Button(self, text="Handoff_threshold",
-                            command=lambda: controller.show_frame(Handoff_threshold))
-        button.pack()
-        
-class Handoff_threshold(Frame):
-
+    #     button = Button(self, text="Handoff_threshold",
+    #                         command=lambda: controller.show_frame(Handoff_threshold))
+    #     button.pack()
     def __init__(self, parent, controller):
         Frame.__init__(self,parent)
         label = Label(self, text="Priority choose", font=LARGE_FONT)
@@ -71,6 +68,22 @@ class Handoff_threshold(Frame):
         button2 = Button(self, text="Handoff queue scheme",
                             command=lambda: controller.show_frame(Handoff_queue))
         button2.pack()
+        
+# class Handoff_threshold(Frame):
+
+#     def __init__(self, parent, controller):
+#         Frame.__init__(self,parent)
+#         label = Label(self, text="Priority choose", font=LARGE_FONT)
+#         label.pack(pady=10,padx=10)
+#         button1 = Button(self, text="Non-priority scheme",
+#                             command=lambda: controller.show_frame(Non_priority))
+#         button1.pack()
+#         button2 = Button(self, text="Priority scheme",
+#                             command=lambda: controller.show_frame(Priority))
+#         button2.pack()
+#         button2 = Button(self, text="Handoff queue scheme",
+#                             command=lambda: controller.show_frame(Handoff_queue))
+#         button2.pack()
 
 class Non_priority(Frame):
 
@@ -96,7 +109,9 @@ class Non_priority(Frame):
         self.num_bs = Entry(self, font=LARGE_FONT)
         self.num_channel_label = Label(self,text ='NUM Channel per BS', font = LARGE_FONT)
         self.num_channel = Entry(self,font=LARGE_FONT)
-   
+        self.p_call_cut_label = Label(self,text ='Power below which call drops', font = LARGE_FONT)
+        self.p_call_cut = Entry(self,font=LARGE_FONT)
+
 
         self.p_min = Entry(self,font=LARGE_FONT)
         self.submit_button = Button(self, text = 'submit',command = lambda: self.submit())
@@ -106,14 +121,13 @@ class Non_priority(Frame):
         self.call_detail = Text(self, height=10, width=20, font=LARGE_FONT)
         self.rec_min_label = Label(self,text ='Minimun recieved power', font = LARGE_FONT)
         self.rec_min = Entry(self,font=LARGE_FONT)
+        self.inter_arrival_label = Label(self,text ='Inter arrival rate', font = LARGE_FONT)
+        self.inter_arrival = Entry(self,font=LARGE_FONT)
         
         
-        plot_button.grid(row = 1, column = 0)
-        initialise_button.grid(row = 1, column = 1)
-        quit_button.grid(row = 2, column = 0)
-        start_button.grid(row = 2, column = 1)
-        pause_button.grid(row = 3, column = 1)
-        self.status.grid(row = 20, column = 1)
+        
+        self.call_detail.grid(row = 4 , column = 5,rowspan = 8, sticky=W)
+        self.status.grid(row = 4, column = 6, rowspan = 8, sticky=W)
         self.p_min_label.grid(row = 4, column = 0 )
         self.p_min.grid(row = 4, column = 1)
         self.u_label.grid(row = 5, column = 0 )
@@ -126,12 +140,19 @@ class Non_priority(Frame):
         self.num_channel.grid(row = 8, column = 1)
         self.rec_min_label.grid(row = 9,column = 0)
         self.rec_min.grid(row = 9,column = 1)
-        back.grid(row = 15, column = 1)
-
+        self.p_call_cut_label.grid(row = 10,column = 0, sticky=W)
+        self.p_call_cut.grid(row = 10,column = 1, sticky=W)
+        self.inter_arrival_label.grid(row = 11,column = 0, sticky=W)
+        self.inter_arrival.grid(row = 11,column = 1, sticky=W)
+        plot_button.grid(row = 12, column = 0, sticky=W)
+        initialise_button.grid(row = 12, column = 1, sticky=W)
         
-        self.submit_button.grid(row = 5, column = 2  )
-        self.clear_button.grid(row = 5, column = 3)
-        self.call_detail.grid(row = 1 , column = 2)
+        pause_button.grid(row = 12, column = 2, sticky=W)
+        start_button.grid(row = 12, column = 3, sticky=W)
+        quit_button.grid(row = 13, column = 0, sticky=W)
+        self.submit_button.grid(row = 13, column = 1 , sticky=W)
+        self.clear_button.grid(row = 13, column = 2, sticky=W)
+        back.grid(row = 13, column = 3, sticky=W)
         
     def clear_status(self):
         self.status.delete('1.0', END)
@@ -144,6 +165,8 @@ class Non_priority(Frame):
         self.sys.num_user = int(self.num_user.get())
         self.sys.channel_per_bs = int(self.num_channel.get())
         self.sys.rec_min = float(self.rec_min.get())
+        self.sys.lam1 = float(self.inter_arrival.get())
+        self.sys.p_call_cut = float(self.p_call_cut.get())
 
     def print_status(self,text):
         self.status.insert(END, text)
@@ -160,14 +183,14 @@ class Non_priority(Frame):
         self.ax1.axis([-1,self.sys.d+1,-1,self.sys.d+1])
         self.canvas1 = FigureCanvasTkAgg(self.fig1, master = self)   
         self.canvas1.draw() 
-        self.canvas1.get_tk_widget().grid(row = 20,column = 0)
+        self.canvas1.get_tk_widget().grid(row = 20,column = 0,columnspan = 3)
         self.ani1 = animation.FuncAnimation(self.fig1, self.animate1, frames=100,interval=200)
         
         self.fig2 = Figure(figsize = (5, 5), dpi = 100)
         self.ax2 = self.fig2.add_subplot(1,1,1)
         self.canvas2 = FigureCanvasTkAgg(self.fig2, master = self)   
         self.canvas2.draw() 
-        self.canvas2.get_tk_widget().grid(row = 20,column = 2)
+        self.canvas2.get_tk_widget().grid(row = 20,column = 3,columnspan = 3)
         
     
     def print_call_detail(self):
@@ -208,7 +231,8 @@ class Non_priority(Frame):
         
         
         for i in self.sys.user_info:
-            bs = self.sys.search_bs_info(i.bs_id)
+            j = self.sys.search_bs_info(i.bs_id)
+            bs = self.sys.bs_info[j]
             if(i.call == 1):
                 self.ax1.plot([i.x,bs.x], [i.y, bs.y])
         
@@ -219,10 +243,10 @@ class Non_priority(Frame):
         self.plot_system()
         self.plot_channel_status()
         #take next step in the animation
-        temp = self.sys.take_step()
+        self.sys.take_step()
         self.print_call_detail()
-        if(len(temp)!=0):
-            for i in temp:
+        if(len(self.sys.status)!=0):
+            for i in self.sys.status:
                 self.print_status(i)
         
 
@@ -250,12 +274,14 @@ class Priority(Frame):
         self.num_bs = Entry(self, font=LARGE_FONT)
         self.num_channel_label = Label(self,text ='NUM Channel per BS', font = LARGE_FONT)
         self.num_channel = Entry(self,font=LARGE_FONT)
-
+        self.p_call_cut_label = Label(self,text ='Power below which call drops', font = LARGE_FONT)
+        self.p_call_cut = Entry(self,font=LARGE_FONT)
         self.num_channel_handoff_label = Label(self,text ='NUM Channel handoff', font = LARGE_FONT)
         self.num_channel_handoff = Entry(self,font=LARGE_FONT)
         self.rec_min_label = Label(self,text ='Minimun recieved power', font = LARGE_FONT)
         self.rec_min = Entry(self,font=LARGE_FONT)
-
+        self.inter_arrival_label = Label(self,text ='Inter arrival rate', font = LARGE_FONT)
+        self.inter_arrival = Entry(self,font=LARGE_FONT)
         self.p_min = Entry(self,font=LARGE_FONT)
         self.submit_button = Button(self, text = 'submit',command = lambda: self.submit())
         self.u = Entry(self,font=LARGE_FONT)
@@ -263,12 +289,8 @@ class Priority(Frame):
         
         self.call_detail = Text(self, height=10, width=20, font=LARGE_FONT)
         
-        plot_button.grid(row = 1, column = 0)
-        initialise_button.grid(row = 1, column = 1)
-        quit_button.grid(row = 2, column = 0)
-        start_button.grid(row = 2, column = 1)
-        pause_button.grid(row = 3, column = 1)
-        self.status.grid(row = 20, column = 1)
+        self.call_detail.grid(row = 4 , column = 5,rowspan = 8, sticky=W)
+        self.status.grid(row = 4, column = 6, rowspan = 8, sticky=W)
         self.p_min_label.grid(row = 4, column = 0 )
         self.p_min.grid(row = 4, column = 1)
         self.u_label.grid(row = 5, column = 0 )
@@ -283,11 +305,20 @@ class Priority(Frame):
         self.num_channel_handoff.grid(row = 9, column = 1)
         self.rec_min_label.grid(row = 10,column = 0)
         self.rec_min.grid(row = 10,column = 1)
-        back.grid(row = 15, column = 1)
+        self.p_call_cut_label.grid(row = 11,column = 0, sticky=W)
+        self.p_call_cut.grid(row = 11,column = 1, sticky=W)
+        self.inter_arrival_label.grid(row = 12,column = 0, sticky=W)
+        self.inter_arrival.grid(row = 12,column = 1, sticky=W)
         
-        self.submit_button.grid(row = 5, column = 2  )
-        self.clear_button.grid(row = 5, column = 3)
-        self.call_detail.grid(row = 1 , column = 2)
+        plot_button.grid(row = 13, column = 0, sticky=W)
+        initialise_button.grid(row = 13, column = 1, sticky=W)
+        pause_button.grid(row = 13, column = 2, sticky=W)
+        start_button.grid(row = 13, column = 3, sticky=W)
+        
+        quit_button.grid(row = 14, column = 0, sticky=W)
+        self.submit_button.grid(row = 14, column = 1 , sticky=W)
+        self.clear_button.grid(row = 14, column = 2, sticky=W)
+        back.grid(row = 14, column = 3, sticky=W)
         
     def clear_status(self):
         self.status.delete('1.0', END)
@@ -301,8 +332,9 @@ class Priority(Frame):
         self.sys.channel = int(self.num_channel.get())
         self.sys.channel_handoff = int(self.num_channel_handoff.get())
         self.sys.rec_min = float(self.rec_min.get())
-        # print(self.sys.channel)
-    
+        self.sys.p_call_cut = int(self.p_call_cut.get())
+        self.sys.lam1 = float(self.inter_arrival.get())
+
     def print_status(self,text):
         self.status.insert(END, text)
         
@@ -318,14 +350,14 @@ class Priority(Frame):
         self.ax1.axis([-1,self.sys.d+1,-1,self.sys.d+1])
         self.canvas1 = FigureCanvasTkAgg(self.fig1, master = self)   
         self.canvas1.draw() 
-        self.canvas1.get_tk_widget().grid(row = 20,column = 0)
+        self.canvas1.get_tk_widget().grid(row = 20,column = 0,columnspan = 3)
         self.ani1 = animation.FuncAnimation(self.fig1, self.animate1, frames=100,interval=200)
         
         self.fig2 = Figure(figsize = (5, 5), dpi = 100)
         self.ax2 = self.fig2.add_subplot(1,1,1)
         self.canvas2 = FigureCanvasTkAgg(self.fig2, master = self)   
         self.canvas2.draw() 
-        self.canvas2.get_tk_widget().grid(row = 20,column = 2)
+        self.canvas2.get_tk_widget().grid(row = 20,column = 3, columnspan = 3)
     
     def print_call_detail(self):
         self.call_detail.delete('1.0', END)
@@ -371,7 +403,8 @@ class Priority(Frame):
         
         
         for i in self.sys.user_info:
-            bs = self.sys.search_bs_info(i.bs_id)
+            j = self.sys.search_bs_info(i.bs_id)
+            bs = self.sys.bs_info[j]
             if(i.call == 1):
                 self.ax1.plot([i.x,bs.x], [i.y, bs.y])
         
@@ -382,10 +415,10 @@ class Priority(Frame):
         self.plot_system()
         self.plot_channel_status()
         #take next step in the animation
-        temp = self.sys.take_step()
+        self.sys.take_step()
         self.print_call_detail()
-        if(len(temp)!=0):
-            for i in temp:
+        if(len(self.sys.status)!=0):
+            for i in self.sys.status:
                 self.print_status(i)
 
 class Handoff_queue(Frame):
@@ -412,14 +445,15 @@ class Handoff_queue(Frame):
         self.num_bs = Entry(self, font=LARGE_FONT)
         self.num_channel_label = Label(self,text ='NUM Channel per BS', font = LARGE_FONT)
         self.num_channel = Entry(self,font=LARGE_FONT)
-        self.len_queue_label = Label(self,text ='Max queue len', font = LARGE_FONT)
-        self.len_queue = Entry(self,font=LARGE_FONT)
+        self.p_call_cut_label = Label(self,text ='Power below which call drops', font = LARGE_FONT)
+        self.p_call_cut = Entry(self,font=LARGE_FONT)
 
         self.num_channel_handoff_label = Label(self,text ='NUM Channel handoff', font = LARGE_FONT)
         self.num_channel_handoff = Entry(self,font=LARGE_FONT)
         self.rec_min_label = Label(self,text ='Minimun recieved power', font = LARGE_FONT)
         self.rec_min = Entry(self,font=LARGE_FONT)
-
+        self.inter_arrival_label = Label(self,text ='Inter arrival rate', font = LARGE_FONT)
+        self.inter_arrival = Entry(self,font=LARGE_FONT)
         self.p_min = Entry(self,font=LARGE_FONT)
         self.submit_button = Button(self, text = 'submit',command = lambda: self.submit())
         self.u = Entry(self,font=LARGE_FONT)
@@ -427,33 +461,36 @@ class Handoff_queue(Frame):
         
         self.call_detail = Text(self, height=10, width=20, font=LARGE_FONT)
         
-        plot_button.grid(row = 1, column = 0)
-        initialise_button.grid(row = 1, column = 1)
-        quit_button.grid(row = 2, column = 0)
-        start_button.grid(row = 2, column = 1)
-        pause_button.grid(row = 3, column = 1)
-        self.status.grid(row = 20, column = 1)
-        self.p_min_label.grid(row = 4, column = 0 )
-        self.p_min.grid(row = 4, column = 1)
-        self.u_label.grid(row = 5, column = 0 )
-        self.u.grid(row = 5, column = 1)
-        self.num_bs_label.grid(row = 6, column = 0 )
-        self.num_bs.grid(row = 6, column = 1)
-        self.num_user_label.grid(row = 7, column = 0 )
-        self.num_user.grid(row = 7, column = 1)
-        self.num_channel_label.grid(row = 8, column = 0)
-        self.num_channel.grid(row = 8, column = 1)
-        self.num_channel_handoff_label.grid(row = 9, column = 0)
-        self.num_channel_handoff.grid(row = 9, column = 1)
-        self.rec_min_label.grid(row = 10,column = 0)
-        self.rec_min.grid(row = 10,column = 1)
-        self.len_queue_label.grid(row = 11,column = 0)
-        self.len_queue.grid(row = 11,column = 1)
-        back.grid(row = 15, column = 1)
+        self.call_detail.grid(row = 4 , column = 5,rowspan = 8, sticky=W)
+        self.status.grid(row = 4, column = 6, rowspan = 8, sticky=W)
+        self.p_min_label.grid(row = 4, column = 0, sticky=W)
+        self.p_min.grid(row = 4, column = 1, sticky=W)
+        self.u_label.grid(row = 5, column = 0 , sticky=W)
+        self.u.grid(row = 5, column = 1, sticky=W)
+        self.num_bs_label.grid(row = 6, column = 0 , sticky=W)
+        self.num_bs.grid(row = 6, column = 1, sticky=W)
+        self.num_user_label.grid(row = 7, column = 0 , sticky=W)
+        self.num_user.grid(row = 7, column = 1, sticky=W)
+        self.num_channel_label.grid(row = 8, column = 0, sticky=W)
+        self.num_channel.grid(row = 8, column = 1, sticky=W)
+        self.num_channel_handoff_label.grid(row = 9, column = 0, sticky=W)
+        self.num_channel_handoff.grid(row = 9, column = 1, sticky=W)
+        self.rec_min_label.grid(row = 10,column = 0, sticky=W)
+        self.rec_min.grid(row = 10,column = 1, sticky=W)
+        self.p_call_cut_label.grid(row = 11,column = 0, sticky=W)
+        self.p_call_cut.grid(row = 11,column = 1, sticky=W)
+        self.inter_arrival_label.grid(row = 12,column = 0, sticky=W)
+        self.inter_arrival.grid(row = 12,column = 1, sticky=W)
+        plot_button.grid(row = 13, column = 0, sticky=W)
+        initialise_button.grid(row = 13, column = 1, sticky=W)
+        pause_button.grid(row = 13, column = 2, sticky=W)
+        start_button.grid(row = 13, column = 3, sticky=W)
+        quit_button.grid(row = 14, column = 0, sticky=W)
         
-        self.submit_button.grid(row = 5, column = 2  )
-        self.clear_button.grid(row = 5, column = 3)
-        self.call_detail.grid(row = 1 , column = 2)
+        self.submit_button.grid(row = 14, column = 1 , sticky=W)
+        self.clear_button.grid(row = 14, column = 2, sticky=W)
+        back.grid(row = 14, column = 3, sticky=W)
+       
         
     def clear_status(self):
         self.status.delete('1.0', END)
@@ -467,7 +504,8 @@ class Handoff_queue(Frame):
         self.sys.channel = int(self.num_channel.get())
         self.sys.channel_handoff = int(self.num_channel_handoff.get())
         self.sys.rec_min = float(self.rec_min.get())
-        self.sys.max_queue_len = int(self.len_queue.get())
+        self.sys.p_call_cut = int(self.p_call_cut.get())
+        self.sys.lam1 = float(self.inter_arrival.get())
         # print(self.sys.channel)
     
     def print_status(self,text):
@@ -485,26 +523,20 @@ class Handoff_queue(Frame):
         self.ax1.axis([-1,self.sys.d+1,-1,self.sys.d+1])
         self.canvas1 = FigureCanvasTkAgg(self.fig1, master = self)   
         self.canvas1.draw() 
-        self.canvas1.get_tk_widget().grid(row = 20,column = 0)
+        self.canvas1.get_tk_widget().grid(row = 20,column = 0, columnspan = 3)
         self.ani1 = animation.FuncAnimation(self.fig1, self.animate1, frames=100,interval=200)
         
         self.fig2 = Figure(figsize = (5, 5), dpi = 100)
         self.ax2 = self.fig2.add_subplot(1,1,1)
         self.canvas2 = FigureCanvasTkAgg(self.fig2, master = self)
         self.canvas2.draw() 
-        self.canvas2.get_tk_widget().grid(row = 20,column = 2)
+        self.canvas2.get_tk_widget().grid(row = 20,column = 3,columnspan = 3)
 
         self.fig3 = Figure(figsize = (5, 5), dpi = 100)
         self.ax3 = self.fig3.add_subplot(1,1,1)
         self.canvas3 = FigureCanvasTkAgg(self.fig3, master = self)
         self.canvas3.draw() 
-        self.canvas3.get_tk_widget().grid(row = 20,column = 3)
-
-        # self.fig3 = Figure(figsize = (5, 5), dpi = 100)
-        # self.ax3 = self.fig3.add_subplot(1,1,1)
-        # self.canvas3 = FigureCanvasTkAgg(self.fig3, master = self)
-        # self.canvas3.draw() 
-        # self.canvas3.get_tk_widget().grid(row = 20,column = 3)
+        self.canvas3.get_tk_widget().grid(row = 20,column = 6,columnspan = 3)
     
     def print_call_detail(self):
         self.call_detail.delete('1.0', END)

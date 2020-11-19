@@ -10,7 +10,7 @@ from matplotlib.backends.backend_tkagg import (FigureCanvasTkAgg, NavigationTool
 import time
 import matplotlib.animation as animation
 
-class Handoff_queue_system:
+class Priority_system:
 
     def __init__(self):
         self.d = 200
@@ -20,15 +20,12 @@ class Handoff_queue_system:
         self.time_step = 0.5 #after how many sec will the graph update
         self.u = 10 #mean rate of exponential distribution
         self.lam1 = 5 #mean rate of poisson process
-        self.num_user = 100
+        self.num_user = 1000
         self.num_bs = 5
         self.channel = 20
         self.channel_handoff = 5
-        self.max_queue_len = 5
         
     def initialise(self):
-        self.status = [] #we can add the handoff status in this variable to print 
-        self.max_wait = 3
         self.p_call_cut = -70
         self.call_total = 0
         self.call_drop = 0
@@ -47,7 +44,8 @@ class Handoff_queue_system:
             bs.x = random.randint(0,self.d)
             bs.y = random.randint(0,self.d)
             bs.bs_id = bs_id
-            
+            # bs.channel = self.channel_per_bs
+            # bs.channel_handoff = self.channel_handoff
             bs_id +=1
             self.bs_info.append(bs)
             
@@ -86,13 +84,13 @@ class Handoff_queue_system:
                 i.y += random.choices([0,5,-5], weights = [0.4,0.3,0.3],k=1)[0]
         
         self.measure_power()
-        self.time += self.time_step
-        self.check_handoff()
-        self.serve_queue()
-        self.call_update()
-       
         
-
+        self.time += self.time_step
+        self.call_update()
+        
+        self.check_handoff()
+        
+    
     def check_handoff(self):
         self.status = []
         for i in self.user_info:
@@ -104,52 +102,41 @@ class Handoff_queue_system:
                 
                 self.status.append('handoff required:\n'+'user_id: '+user_id+'\n'+\
                             'bs_id: '+bs_id+'\n'+'power: '+power+'\n\n')
-                self.handoff_algo(i)
+                temp1 = self.handoff_algo(i)
                 
-     
+                if(temp1 != 0):
+                    i = temp1
+                    user_id = str(i.user_id)
+                    bs_id = str(i.bs_id)
+                    power = str(i.pow_cur)
 
-    def add_to_queue(self,user_id,bs_id):
-        i = self.search_bs_info(bs_id)
-        bs = self.bs_info[i]
-        # if(len(bs.handoff_queue) < self.max_queue_len):
-        bs.handoff_queue.append([user_id,self.time])
-        
-        self.bs_info[i] = bs
-        # print(self.bs_info[i].handoff_queue)
-        # return 0
-    
-    def serve_queue(self):
-
-        for i in self.bs_info:
-            for j in i.handoff_queue:
-                k = self.search_ms_info(j[0])
-                if(isinstance(k, int) == False):
-                    i.handoff_queue.remove(j)
-                    continue
-                ms = self.user_info[k]
-                if(self.time - j[1]> self.max_wait or ms.call_duration <= 0):
-                    #remove the handoff request from the queue if max wait time is exceeded
-                    i.handoff_queue.remove(j)
-                
+                    self.status.append('handoff success:\n'+'user_id: '+user_id+'\n'+\
+                                'bs_id: '+bs_id+'\n'+'power: '+power+'\n\n')
                 else:
-                    val = self.check_channel(i.bs_id,0)
-                    if(val in [0,1]):
-                        self.add_call(ms.user_id,i.bs_id,val)
-                        i.handoff_queue.remove(j)
-                        self.delete_call(ms.user_id,ms.bs_id)
-                        ms.bs_id = i.bs_id
-                        ms.pow_cur = ms.pow[i.bs_id]
-                        self.num_handoff_success += 1
+                    user_id = str(i.user_id)
+                    bs_id = str(i.bs_id)
+                    power = str(i.pow_cur)
 
-                self.user_info[k] = ms
-
-
+                    self.status.append('handoff FAILED:\n'+'user_id: '+user_id+'\n'+\
+                                'bs_id: '+bs_id+'\n'+'power: '+power+'\n\n')
+     
+    
     def handoff_algo(self,ms):
+        
         temp = sorted(ms.pow, key=lambda x: x[1], reverse = True)
         
         for i in temp:
             if (i[1]> self.rec_min and ms.bs_id != i[0]):
-                self.add_to_queue(ms.user_id,i[0])
+                val = self.check_channel(i[0],0)
+                if(val in [0,1]):
+                    self.add_call(ms.user_id,i[0],val)
+                    self.delete_call(ms.user_id,ms.bs_id)
+                    ms.bs_id = i[0]
+                    ms.pow_cur = i[1]
+                    self.num_handoff_success += 1
+                    return ms
+
+        return 0
 
     def add_call(self,user_id,bs_id,type):
         #type 0: dedicated handoff channel
@@ -162,9 +149,9 @@ class Handoff_queue_system:
         if(type == 0):
             bs.handoff_id.append(user_id)
             bs.channel_handoff += 1
-                
-        self.bs_info[i] = bs
 
+        self.bs_info[i] = bs
+                
     def delete_call(self,user_id,bs_id):
         i = self.search_bs_info(bs_id)
         bs = self.bs_info[i]
@@ -233,12 +220,6 @@ class Handoff_queue_system:
         for i in range(len(self.bs_info)):
             if(self.bs_info[i].bs_id == bs_id):
                 return i
-    
-    def search_ms_info(self, user_id):
-        #returns the bs object of the bs_id given
-        for i in range(len(self.user_info)):
-            if(self.user_info[i].user_id == user_id):
-                return i
                 
     def call_update(self):
         
@@ -292,7 +273,6 @@ class Handoff_queue_system:
             self.call_duration = 0
             self.last_call = 0
             self.next_call = 0
-            self.target_bs_id = 0
 
     class BS:
         def __init__(self):
@@ -301,7 +281,5 @@ class Handoff_queue_system:
             self.bs_id = 0
             self.call_id = []
             self.handoff_id = []
-            self.handoff_queue = []
-            self.max_queue_len = 0
             self.channel_call = 0
             self.channel_handoff = 0

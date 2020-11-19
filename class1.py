@@ -10,26 +10,24 @@ from matplotlib.backends.backend_tkagg import (FigureCanvasTkAgg, NavigationTool
 import time
 import matplotlib.animation as animation
 
-class Handoff_queue_system:
-
+class Nonpriority_system:
+    
     def __init__(self):
         self.d = 200
-        self.p_min = -56
-        self.rec_min = -52
+        self.p_min = 0
+        self.rec_min = 0
+        self.p_call_cut = -70
         self.time = 0
         self.time_step = 0.5 #after how many sec will the graph update
-        self.u = 10 #mean rate of exponential distribution
+        self.u = 2 #mean rate of exponential distribution
         self.lam1 = 5 #mean rate of poisson process
-        self.num_user = 100
-        self.num_bs = 5
-        self.channel = 20
-        self.channel_handoff = 5
-        self.max_queue_len = 5
+        self.num_user = 0
+        self.num_bs = 0
+        self.channel_per_bs = 5
+        
         
     def initialise(self):
-        self.status = [] #we can add the handoff status in this variable to print 
-        self.max_wait = 3
-        self.p_call_cut = -70
+        self.status = []
         self.call_total = 0
         self.call_drop = 0
         self.call_drop_prob = 0
@@ -47,7 +45,7 @@ class Handoff_queue_system:
             bs.x = random.randint(0,self.d)
             bs.y = random.randint(0,self.d)
             bs.bs_id = bs_id
-            
+            bs.channel = self.channel_per_bs
             bs_id +=1
             self.bs_info.append(bs)
             
@@ -86,13 +84,13 @@ class Handoff_queue_system:
                 i.y += random.choices([0,5,-5], weights = [0.4,0.3,0.3],k=1)[0]
         
         self.measure_power()
-        self.time += self.time_step
-        self.check_handoff()
-        self.serve_queue()
-        self.call_update()
-       
         
-
+        self.time += self.time_step
+        self.call_update()
+        
+        self.check_handoff()
+        # return status
+    
     def check_handoff(self):
         self.status = []
         for i in self.user_info:
@@ -104,98 +102,48 @@ class Handoff_queue_system:
                 
                 self.status.append('handoff required:\n'+'user_id: '+user_id+'\n'+\
                             'bs_id: '+bs_id+'\n'+'power: '+power+'\n\n')
-                self.handoff_algo(i)
+                temp1 = self.handoff_algo(i)
                 
-     
+                if(temp1 != 0):
+                    i = temp1
+                    user_id = str(i.user_id)
+                    bs_id = str(i.bs_id)
+                    power = str(i.pow_cur)
 
-    def add_to_queue(self,user_id,bs_id):
-        i = self.search_bs_info(bs_id)
-        bs = self.bs_info[i]
-        # if(len(bs.handoff_queue) < self.max_queue_len):
-        bs.handoff_queue.append([user_id,self.time])
-        
-        self.bs_info[i] = bs
-        # print(self.bs_info[i].handoff_queue)
-        # return 0
-    
-    def serve_queue(self):
-
-        for i in self.bs_info:
-            for j in i.handoff_queue:
-                k = self.search_ms_info(j[0])
-                if(isinstance(k, int) == False):
-                    i.handoff_queue.remove(j)
-                    continue
-                ms = self.user_info[k]
-                if(self.time - j[1]> self.max_wait or ms.call_duration <= 0):
-                    #remove the handoff request from the queue if max wait time is exceeded
-                    i.handoff_queue.remove(j)
-                
+                    self.status.append('handoff success:\n'+'user_id: '+user_id+'\n'+\
+                                'bs_id: '+bs_id+'\n'+'power: '+power+'\n\n')
                 else:
-                    val = self.check_channel(i.bs_id,0)
-                    if(val in [0,1]):
-                        self.add_call(ms.user_id,i.bs_id,val)
-                        i.handoff_queue.remove(j)
-                        self.delete_call(ms.user_id,ms.bs_id)
-                        ms.bs_id = i.bs_id
-                        ms.pow_cur = ms.pow[i.bs_id]
-                        self.num_handoff_success += 1
+                    user_id = str(i.user_id)
+                    bs_id = str(i.bs_id)
+                    power = str(i.pow_cur)
 
-                self.user_info[k] = ms
-
-
+                    self.status.append('handoff FAILED:\n'+'user_id: '+user_id+'\n'+\
+                                'bs_id: '+bs_id+'\n'+'power: '+power+'\n\n')
+     
+        
+    
     def handoff_algo(self,ms):
+        # self.rec_min = -70
         temp = sorted(ms.pow, key=lambda x: x[1], reverse = True)
         
         for i in temp:
             if (i[1]> self.rec_min and ms.bs_id != i[0]):
-                self.add_to_queue(ms.user_id,i[0])
-
-    def add_call(self,user_id,bs_id,type):
-        #type 0: dedicated handoff channel
-        #type 1: normal call channel
-        i = self.search_bs_info(bs_id)
-        bs = self.bs_info[i]
-        if(type == 1):
-            bs.call_id.append(user_id)
-            bs.channel_call+=1
-        if(type == 0):
-            bs.handoff_id.append(user_id)
-            bs.channel_handoff += 1
-                
-        self.bs_info[i] = bs
-
-    def delete_call(self,user_id,bs_id):
-        i = self.search_bs_info(bs_id)
-        bs = self.bs_info[i]
-        if(user_id in bs.call_id):
-            bs.call_id.remove(user_id)
-            bs.channel_call -=1
-        else:
-            bs.handoff_id.remove(user_id)
-            bs.channel_handoff-=1
-
-        self.bs_info[i] = bs
+                if(self.check_channel(i[0]) == 1):
+                    self.add_call(ms.user_id,i[0])
+                    self.delete_call(ms.user_id,ms.bs_id)
+                    ms.bs_id = i[0]
+                    ms.pow_cur = i[1]
+                    self.num_handoff_success += 1
+                    return ms
+        return 0
         
-    def check_channel(self,bs_id,type):
-        #type 1 is orginating call
-        #type 0 is handoff call
+    def check_channel(self,bs_id):
         i = self.search_bs_info(bs_id)
         bs = self.bs_info[i]
-        if(type == 1):
-            if(bs.channel_call  < (self.channel- self.channel_handoff)):
-                return 0 #add call to originating call channel
-            else:
-                return 1 #no space to add call, drop the call
-        if(type == 0):
-            if(bs.channel_handoff < self.channel_handoff):
-                return 0 #add handoff to dedicated handoff channel
-
-            elif((bs.channel_call+bs.channel_handoff) <self.channel):
-                return 1 #add handoff to normal call channel
-
-            else:
-                return 2 #no space for the handoff call/can't accept
+        if(len(bs.call_id) < bs.channel):
+            return 1
+        
+        return 0
                                
     def measure_power(self):
         path_loss = 3
@@ -217,7 +165,7 @@ class Handoff_queue_system:
                 if(j.bs_id == i.bs_id):
                     i.pow_cur = power
                 i.pow.append([j.bs_id,power])
-                
+
         #change the BS the Ms is following if power<p_min
         for i in self.user_info:
             if(i.call == 0 and i.pow_cur < self.p_min):
@@ -227,17 +175,10 @@ class Handoff_queue_system:
                         i.bs_id = j[0]
                         i.pow_cur = j[1]
                 
-                
     def search_bs_info(self, bs_id):
-        #returns the bs object index of the bs_id given
+        #returns the bs object of the bs_id given
         for i in range(len(self.bs_info)):
             if(self.bs_info[i].bs_id == bs_id):
-                return i
-    
-    def search_ms_info(self, user_id):
-        #returns the bs object of the bs_id given
-        for i in range(len(self.user_info)):
-            if(self.user_info[i].user_id == user_id):
                 return i
                 
     def call_update(self):
@@ -263,9 +204,9 @@ class Handoff_queue_system:
             elif(i.call == 0):
                 if(i.next_call == self.time):
                     self.call_total += 1
-                    if(self.check_channel(i.bs_id,1) ==0):
+                    if(self.check_channel(i.bs_id) ==1):
                         i.call = 1 
-                        self.add_call(i.user_id,i.bs_id,1)
+                        self.add_call(i.user_id,i.bs_id)
                         i.call_duration = np.random.exponential(scale=self.u , size=None)
                         
                     else:
@@ -274,6 +215,16 @@ class Handoff_queue_system:
                         
         if(self.call_total != 0):                
             self.call_drop_prob = self.call_drop*100/self.call_total
+        
+    def add_call(self,user_id,bs_id):
+        for i in self.bs_info:
+            if(i.bs_id == bs_id):
+                i.call_id.append(user_id)
+                
+    def delete_call(self,user_id,bs_id):
+        for i in self.bs_info:
+            if(i.bs_id == bs_id):
+                i.call_id.remove(user_id)
             
     def dist(self,x1,y1,x2,y2):
         return np.sqrt((x1-x2)**2 + (y1-y2)**2)
@@ -292,7 +243,6 @@ class Handoff_queue_system:
             self.call_duration = 0
             self.last_call = 0
             self.next_call = 0
-            self.target_bs_id = 0
 
     class BS:
         def __init__(self):
@@ -300,8 +250,4 @@ class Handoff_queue_system:
             self.y = 0
             self.bs_id = 0
             self.call_id = []
-            self.handoff_id = []
-            self.handoff_queue = []
-            self.max_queue_len = 0
-            self.channel_call = 0
-            self.channel_handoff = 0
+            self.channel = 0
